@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCOTT ZHENG // SOFTWARE ENGINEER</title>
+    <style>
+        /* --- LANDO NORRIS / NEO-BRUTALISM STYLE TOKENS --- */
+        :root {
+            --volt: #D2FF00;       /* The "Lando" Yellow */
+            --obsidian: #111112;   /* Not quite black */
+            --concrete: #F0F0F0;   /* Light grey background */
+            --text-main: #FFFFFF;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background-color: var(--concrete);
+            font-family: 'Courier New', Courier, monospace; /* Tech/Code feel */
+            color: var(--obsidian);
+            overflow-x: hidden;
+        }
+
+        /* --- THE GRID LAYOUT --- */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr; /* 3 Columns */
+            gap: 15px;
+        }
+
+        /* --- BENTO BOXES --- */
+        .box {
+            background: var(--obsidian);
+            color: var(--text-main);
+            padding: 30px;
+            border: 2px solid var(--obsidian);
+            transition: transform 0.2s, box-shadow 0.2s;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .box:hover {
+            transform: translate(-4px, -4px);
+            box-shadow: 8px 8px 0px var(--volt); /* Hard shadow */
+        }
+
+        /* HEADER BOX (Spans 2 columns) */
+        .header-box {
+            grid-column: span 2;
+            background-color: var(--volt);
+            color: var(--obsidian);
+        }
+        
+        h1 {
+            font-size: 3rem;
+            text-transform: uppercase;
+            font-weight: 900;
+            line-height: 0.9;
+            letter-spacing: -2px;
+        }
+
+        /* --- MARQUEE (SCROLLING TEXT) --- */
+        .marquee-container {
+            background: var(--obsidian);
+            color: var(--volt);
+            padding: 15px 0;
+            white-space: nowrap;
+            overflow: hidden;
+            border-bottom: 5px solid var(--volt);
+            margin-bottom: 20px;
+        }
+
+        .marquee-content {
+            display: inline-block;
+            animation: scroll 20s linear infinite;
+            font-size: 1.5rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        @keyframes scroll {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+
+        /* MOBILE RESPONSIVENESS */
+        @media (max-width: 768px) {
+            .container { grid-template-columns: 1fr; }
+            .header-box { grid-column: span 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="marquee-container">
+        <div class="marquee-content">
+            SCOTT ZHENG // SOFTWARE ENGINEER // NYC // PYTHON // C // SYSTEM ARCHITECTURE // OPEN TO WORK // SCOTT ZHENG // SOFTWARE ENGINEER // NYC // PYTHON // C // SYSTEM ARCHITECTURE // OPEN TO WORK //
+        </div>
+    </div>
+
+    <div class="container">
+        
+        <div class="box header-box">
+            <p>HELLO_WORLD</p>
+            <h1>SCOTT<br>ZHENG</h1>
+            <p style="margin-top: 20px; font-weight: bold;">SOFTWARE ENGINEER @ NYC</p>
+        </div>
+
+        <div class="box" style="background: white; color: black; justify-content: center; align-items: center;">
+            <h2>[IMG]</h2>
+        </div>
+
+        <div class="box">
+            <h3>01 // PROJECTS</h3>
+            <p>Palworld Save Transfer Tool</p>
+            <br>
+            <p>> C / Python</p>
+        </div>
+
+        <div class="box" style="background: var(--volt); color: var(--obsidian);">
+            <h3>02 // CONTACT</h3>
+            <a href="mailto:hello@scottzheng.com" style="color: black; font-weight: bold; font-size: 1.5rem; text-decoration: none;">EMAIL ME -></a>
+        </div>
+
+        <div class="box">
+            <h3>03 // STACK</h3>
+            <p>Python</p>
+            <p>C (CS50)</p>
+            <p>Linux</p>
+        </div>
+
+    </div>
+</body>
+</html>

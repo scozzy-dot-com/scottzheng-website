@@ -2,21 +2,42 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Scott Face 64 - Director's Cut</title>
+    <title>Scott Face 64</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #D2FF00; user-select: none;
-            background-image: url('images/super-mario-64-bg.jpg');
+            background-image: url('./images/superscott64.webp');
             background-size: cover; /* Ensures the image covers the whole page */
             background-position: center center; /* Centers the image */
             background-repeat: no-repeat; /* Prevents the image from repeating */ }
         canvas { display: block; cursor: grab; }
         canvas:active { cursor: grabbing; }
+        
+        /* --- UI LAYER --- */
         #ui {
-            position: absolute; bottom: 20px; width: 100%; text-align: center;
-            font-family: 'Courier New', Courier, monospace; font-weight: bold; color: #fdfdfd; pointer-events: none;
+            position: absolute; bottom: 15px; width: 100%; text-align: center;
+            font-family: 'Courier New', Courier, monospace; font-weight: bold; color: #ffffff; pointer-events: none;
+            font-size: 14px; z-index: 10;
         }
         #mute-btn {
             pointer-events: auto; cursor: pointer; text-decoration: underline;
+        }
+
+        /* --- GIF BUTTON (Bottom Left) --- */
+        #start-btn {
+            position: absolute; 
+            bottom: 30px; 
+            left: 20px;
+            width: 180px; /* Adjust size if needed */
+            cursor: pointer;
+            pointer-events: auto;
+            z-index: 20;
+            transition: transform 0.1s, filter 0.2s;
+        }
+
+        /* Interaction State */
+        .playing {
+            filter: brightness(1.3) drop-shadow(0 0 5px gold);
+            transform: scale(1.00);
         }
     </style>
     
@@ -33,83 +54,98 @@
 
     <div id="ui">
         CLICK & DRAG FACE // SCROLL TO ZOOM <br><br>
-        <span id="mute-btn">[ CLICK TO START MUSIC ]</span>
+        <span id="mute-btn">[ SOUND OFF ]</span>
     </div>
+
+    <img id="start-btn" src="./images/mario-press-start.gif" alt="PRESS START">
 
     <script type="module">
         import * as THREE from 'three';
         import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-        // --- TUNING KNOBS (Mario Feel) ---
-        const MODEL_PATH = './scott-head.glb'; 
-        
-        // Physics
-        const RADIUS = 0.25;             // SMALLER: Only grabs the nose/ear, not the whole head
-        const STRETCH_LIMIT = 1.2;       // Don't stretch to infinity
-        const RETURN_SPEED = 0.06;       // Slower snapback for "Gooey" feel
-        const RELEASE_DELAY = 600;       // Dwell time
-        
-        // Animation
-        const IDLE_SPEED = 0.001;        // How fast he looks around
-        const IDLE_AMP = 0.3;            // How far he looks around
+        // --- CONFIG ---
+        const MODEL_PATH = './scott-head_old.glb'; 
+        const RADIUS = 0.3;             
+        const STRETCH_LIMIT = 1.5;       
+        const RETURN_SPEED = 0.08;       
+        const RELEASE_DELAY = 600;       
+        const IDLE_SPEED = 0.001;        
+        const IDLE_AMP = 0.2;            
 
         // --- SETUP ---
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.z = 1.5; // Closer start
+        camera.position.z = 0.8; 
 
         const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
         document.body.appendChild(renderer.domElement);
 
-        // --- CONTROLS (ZOOM) ---
         const controls = new OrbitControls(camera, renderer.domElement);
-        controls.enablePan = false;      // Don't let user move the camera right/left
-        controls.enableRotate = false;   // Don't rotate camera, we rotate the head
-        controls.enableZoom = true;      // ALLOW ZOOM
-        controls.minDistance = 0.8;
-        controls.maxDistance = 3.0;
+        controls.enablePan = false;      
+        controls.enableRotate = false;   
+        controls.enableZoom = true;      
+        controls.minDistance = 0.4; 
+        controls.maxDistance = 1.4; 
 
-        // --- AUDIO SETUP ---
+        // --- AUDIO ---
         const listener = new THREE.AudioListener();
         camera.add(listener);
         const sound = new THREE.Audio(listener);
         const audioLoader = new THREE.AudioLoader();
-        
         let musicLoaded = false;
+
+        // Try to load music, but don't crash if missing
         audioLoader.load('./bgm.mp3', function(buffer) {
             sound.setBuffer(buffer);
             sound.setLoop(true);
             sound.setVolume(0.5);
             musicLoaded = true;
-        });
+        }, undefined, () => console.log("Music file not found (optional)"));
 
-        // Audio Trigger (Browsers require interaction)
-        document.getElementById('mute-btn').addEventListener('click', () => {
+        function toggleMusic() {
+            const btn = document.getElementById('start-btn');
+            const txt = document.getElementById('mute-btn');
+
             if (musicLoaded && !sound.isPlaying) {
                 sound.play();
-                document.getElementById('mute-btn').innerText = "[ MUSIC PLAYING ]";
+                btn.classList.add('playing');
+                txt.innerText = "[ SOUND ON ]";
             } else if (sound.isPlaying) {
                 sound.pause();
-                document.getElementById('mute-btn').innerText = "[ MUSIC PAUSED ]";
+                btn.classList.remove('playing');
+                txt.innerText = "[ SOUND OFF ]";
             }
-        });
+        }
+
+        document.getElementById('start-btn').addEventListener('click', toggleMusic);
+        document.getElementById('mute-btn').addEventListener('click', toggleMusic);
 
         // --- LIGHTING ---
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
         scene.add(ambientLight);
-        const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.5);
         dirLight.position.set(2, 5, 5);
         scene.add(dirLight);
 
-        // --- STATE VARIABLES ---
+        // --- DATA ---
         let headGroup = new THREE.Group(); 
         scene.add(headGroup);
         
-        let meshes = [];
+        let physicsMeshes = []; // Skin, Hair, Neck (Things to pull)
+        let morphMeshes = [];   // Face (Things to animate)
+        let eyeBones = { left: null, right: null }; // Bones to rotate
+
         let isDragging = false;
         let lastMouseUpTime = 0;
+        let time = 0;
+
+        // Expression State
+        let blinkState = 0;
+        let nextBlinkTime = 0;
+        let expression = { smile: 0, open: 0, brow: 0 };
         
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
@@ -125,35 +161,109 @@
             const center = box.getCenter(new THREE.Vector3());
             gltf.scene.position.sub(center);
             
+            // 1. Find Bones (Now that you kept the Armature!)
+            gltf.scene.traverse((child) => {
+                if (child.isBone) {
+                    // Ready Player Me often names them "RightEye" and "LeftEye"
+                    if (child.name.includes("LeftEye") || child.name === "EyeLeft") eyeBones.left = child;
+                    if (child.name.includes("RightEye") || child.name === "EyeRight") eyeBones.right = child;
+                }
+            });
+
+            if (eyeBones.left) console.log("Eye Bones Found! Eyes will track mouse.");
+
+            // 2. Find Meshes
             gltf.scene.traverse((child) => {
                 if (child.isMesh) {
                     child.material.transparent = false;
                     child.material.depthWrite = true;
                     child.material.side = THREE.DoubleSide; 
-                    child.geometry.computeVertexNormals();
 
+                    // Enable Physics
+                    child.geometry.computeVertexNormals();
                     const positions = child.geometry.attributes.position;
                     child.userData.originalPositions = Float32Array.from(positions.array);
-                    meshes.push(child);
+                    physicsMeshes.push(child);
+
+                    // Enable Facial Expressions
+                    if (child.morphTargetDictionary) {
+                        morphMeshes.push(child);
+                    }
                 }
             });
             headGroup.add(gltf.scene);
         });
 
+        function getMorphIndex(mesh, names) {
+            for (let name of names) {
+                if (mesh.morphTargetDictionary.hasOwnProperty(name)) return mesh.morphTargetDictionary[name];
+            }
+            return -1;
+        }
+
+        // --- ANIMATION LOGIC ---
+        function updateFace(dt) {
+            time += dt;
+
+            // 1. Blinking
+            if (time > nextBlinkTime) {
+                blinkState = 1; 
+                nextBlinkTime = time + 2000 + Math.random() * 3000;
+            }
+            if (blinkState > 0) {
+                blinkState -= 0.15; 
+                if (blinkState < 0) blinkState = 0; 
+            }
+
+            // 2. Random Expressions (Smile occasionally)
+            if (Math.random() < 0.01) { 
+                expression.smile = Math.random() * 0.6;
+                expression.brow = Math.random() * 0.8;
+            }
+
+            // 3. Apply Morphs
+            morphMeshes.forEach(mesh => {
+                const iBlinkL = getMorphIndex(mesh, ['eyeBlinkLeft', 'eyesClosed', 'blink_left']);
+                const iBlinkR = getMorphIndex(mesh, ['eyeBlinkRight', 'eyesClosed', 'blink_right']);
+                const iSmile  = getMorphIndex(mesh, ['mouthSmile', 'smile']);
+                const iBrow   = getMorphIndex(mesh, ['browInnerUp', 'brows_up']);
+
+                if (iBlinkL !== -1) mesh.morphTargetInfluences[iBlinkL] = blinkState;
+                if (iBlinkR !== -1) mesh.morphTargetInfluences[iBlinkR] = blinkState;
+                if (iSmile !== -1) mesh.morphTargetInfluences[iSmile] += (expression.smile - mesh.morphTargetInfluences[iSmile]) * 0.1;
+                if (iBrow !== -1) mesh.morphTargetInfluences[iBrow] += (expression.brow - mesh.morphTargetInfluences[iBrow]) * 0.1;
+            });
+
+            // 4. Eye Look (The Real 3D Effect)
+            if (eyeBones.left && eyeBones.right) {
+                // Calculate look angles based on mouse position
+                // Invert X/Y slightly because eyes rotate opposite to look target
+                const lookX = mouse.y * 0.3; 
+                const lookY = mouse.x * 0.3;
+                
+                // Smoothly interpolate current rotation to target
+                eyeBones.left.rotation.x += (lookX - eyeBones.left.rotation.x) * 0.1;
+                eyeBones.left.rotation.y += (lookY - eyeBones.left.rotation.y) * 0.1;
+                
+                // Sync right eye
+                eyeBones.right.rotation.x = eyeBones.left.rotation.x;
+                eyeBones.right.rotation.y = eyeBones.left.rotation.y;
+            }
+        }
+
         // --- INTERACTION ---
         window.addEventListener('mousedown', (e) => {
-            if (meshes.length === 0) return;
+            if (e.target.id === 'start-btn' || e.target.id === 'mute-btn') return;
+            if (physicsMeshes.length === 0) return;
             
-            // Logic to check if we clicked the head
             mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
             mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
             raycaster.setFromCamera(mouse, camera);
-            const intersects = raycaster.intersectObjects(meshes);
+            const intersects = raycaster.intersectObjects(physicsMeshes);
 
             if (intersects.length > 0) {
                 isDragging = true;
-                controls.enabled = false; // Disable zoom while dragging face
-                
+                controls.enabled = false; 
                 dragPlane.setFromNormalAndCoplanarPoint(camera.getWorldDirection(new THREE.Vector3()), intersects[0].point);
                 raycaster.ray.intersectPlane(dragPlane, dragStartPoint);
                 headGroup.worldToLocal(dragStartPoint);
@@ -173,11 +283,9 @@
             const delta = new THREE.Vector3().subVectors(currentDragPoint, dragStartPoint);
             delta.clampLength(0, STRETCH_LIMIT);
 
-            meshes.forEach(mesh => {
+            physicsMeshes.forEach(mesh => {
                 const positions = mesh.geometry.attributes.position;
                 const originals = mesh.userData.originalPositions;
-                
-                // Inverse matrix to calculate local distance correctly inside the group
                 const meshInverseMatrix = mesh.matrixWorld.clone().invert();
                 const localDragStart = dragStartPoint.clone().applyMatrix4(meshInverseMatrix);
                 const localDelta = delta.clone().applyMatrix4(new THREE.Matrix4().extractRotation(meshInverseMatrix));
@@ -186,20 +294,11 @@
                     const ox = originals[i*3];
                     const oy = originals[i*3+1];
                     const oz = originals[i*3+2];
+                    const dist = Math.sqrt(Math.pow(ox - localDragStart.x, 2) + Math.pow(oy - localDragStart.y, 2) + Math.pow(oz - localDragStart.z, 2));
 
-                    const dist = Math.sqrt(
-                        Math.pow(ox - localDragStart.x, 2) +
-                        Math.pow(oy - localDragStart.y, 2) +
-                        Math.pow(oz - localDragStart.z, 2)
-                    );
-
-                    // SHARPER FALLOFF: (dist*dist) makes the influence drop faster
-                    // This creates the "Nose Only" effect rather than "Whole Face"
                     if (dist < RADIUS) {
                         const factor = (RADIUS - dist) / RADIUS;
-                        // Cubic easing for smoother, sharper peaks
                         const influence = Math.pow(factor, 3); 
-
                         positions.setX(i, ox + (localDelta.x * influence));
                         positions.setY(i, oy + (localDelta.y * influence));
                         positions.setZ(i, oz + (localDelta.z * influence));
@@ -211,27 +310,29 @@
 
         window.addEventListener('mouseup', () => {
             isDragging = false;
-            controls.enabled = true; // Re-enable zoom
+            controls.enabled = true; 
             lastMouseUpTime = Date.now(); 
         });
 
-        // --- ANIMATION LOOP ---
+        const clock = new THREE.Clock();
+
         function animate() {
             requestAnimationFrame(animate);
+            const dt = clock.getDelta() * 1000; 
             const now = Date.now();
 
+            updateFace(dt);
+
             if (!isDragging) {
-                // 1. Idle Animation (Look around naturally)
-                // We use Sine waves with different frequencies to make it look non-robotic
+                // Passive Head Sway
                 headGroup.rotation.y = Math.sin(now * IDLE_SPEED) * IDLE_AMP;
                 headGroup.rotation.x = Math.sin(now * IDLE_SPEED * 0.7) * (IDLE_AMP * 0.5);
 
-                // 2. Elastic Snapback (Wait for delay, then return)
                 if (now - lastMouseUpTime > RELEASE_DELAY) {
-                    let isMoving = false;
-                    meshes.forEach(mesh => {
+                    physicsMeshes.forEach(mesh => {
                         const positions = mesh.geometry.attributes.position;
                         const originals = mesh.userData.originalPositions;
+                        let isMoving = false;
 
                         for (let i = 0; i < positions.count; i++) {
                             const cx = positions.getX(i);
@@ -256,15 +357,11 @@
                                 positions.setZ(i, oz);
                             }
                         }
-                        if (isMoving) {
-                            positions.needsUpdate = true;
-                            // mesh.geometry.computeVertexNormals(); // Uncomment if lighting looks weird during snapback
-                        }
+                        if (isMoving) positions.needsUpdate = true;
                     });
                 }
             } else {
-                // While dragging, make the head look toward the mouse slightly
-                // This adds to the depth effect
+                // When dragging, head also follows mouse
                 headGroup.rotation.y += (mouse.x * 0.5 - headGroup.rotation.y) * 0.1;
                 headGroup.rotation.x += (-mouse.y * 0.5 - headGroup.rotation.x) * 0.1;
             }

@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Scott Face 64 - Director's Cut</title>
+    <style>
+        body { margin: 0; overflow: hidden; background-color: #D2FF00; user-select: none;
+            background-image: url('images/super-mario-64-bg.jpg');
+            background-size: cover; /* Ensures the image covers the whole page */
+            background-position: center center; /* Centers the image */
+            background-repeat: no-repeat; /* Prevents the image from repeating */ }
+        canvas { display: block; cursor: grab; }
+        canvas:active { cursor: grabbing; }
+        #ui {
+            position: absolute; bottom: 20px; width: 100%; text-align: center;
+            font-family: 'Courier New', Courier, monospace; font-weight: bold; color: #fdfdfd; pointer-events: none;
+        }
+        #mute-btn {
+            pointer-events: auto; cursor: pointer; text-decoration: underline;
+        }
+    </style>
+    
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+</head>
+<body>
+
+    <div id="ui">
+        CLICK & DRAG FACE // SCROLL TO ZOOM <br><br>
+        <span id="mute-btn">[ CLICK TO START MUSIC ]</span>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // --- TUNING KNOBS (Mario Feel) ---
+        const MODEL_PATH = './scott-head.glb'; 
+        
+        // Physics
+        const RADIUS = 0.25;             // SMALLER: Only grabs the nose/ear, not the whole head
+        const STRETCH_LIMIT = 1.2;       // Don't stretch to infinity
+        const RETURN_SPEED = 0.06;       // Slower snapback for "Gooey" feel
+        const RELEASE_DELAY = 600;       // Dwell time
+        
+        // Animation
+        const IDLE_SPEED = 0.001;        // How fast he looks around
+        const IDLE_AMP = 0.3;            // How far he looks around
+
+        // --- SETUP ---
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 1.5; // Closer start
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // --- CONTROLS (ZOOM) ---
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enablePan = false;      // Don't let user move the camera right/left
+        controls.enableRotate = false;   // Don't rotate camera, we rotate the head
+        controls.enableZoom = true;      // ALLOW ZOOM
+        controls.minDistance = 0.8;
+        controls.maxDistance = 3.0;
+
+        // --- AUDIO SETUP ---
+        const listener = new THREE.AudioListener();
+        camera.add(listener);
+        const sound = new THREE.Audio(listener);
+        const audioLoader = new THREE.AudioLoader();
+        
+        let musicLoaded = false;
+        audioLoader.load('./bgm.mp3', function(buffer) {
+            sound.setBuffer(buffer);
+            sound.setLoop(true);
+            sound.setVolume(0.5);
+            musicLoaded = true;
+        });
+
+        // Audio Trigger (Browsers require interaction)
+        document.getElementById('mute-btn').addEventListener('click', () => {
+            if (musicLoaded && !sound.isPlaying) {
+                sound.play();
+                document.getElementById('mute-btn').innerText = "[ MUSIC PLAYING ]";
+            } else if (sound.isPlaying) {
+                sound.pause();
+                document.getElementById('mute-btn').innerText = "[ MUSIC PAUSED ]";
+            }
+        });
+
+        // --- LIGHTING ---
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+        scene.add(ambientLight);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        dirLight.position.set(2, 5, 5);
+        scene.add(dirLight);
+
+        // --- STATE VARIABLES ---
+        let headGroup = new THREE.Group(); 
+        scene.add(headGroup);
+        
+        let meshes = [];
+        let isDragging = false;
+        let lastMouseUpTime = 0;
+        
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        const dragStartPoint = new THREE.Vector3();
+        const currentDragPoint = new THREE.Vector3();
+        const planeNormal = new THREE.Vector3(0, 0, 1);
+        const dragPlane = new THREE.Plane(planeNormal, 0);
+
+        // --- LOADER ---
+        const loader = new GLTFLoader();
+        loader.load(MODEL_PATH, (gltf) => {
+            const box = new THREE.Box3().setFromObject(gltf.scene);
+            const center = box.getCenter(new THREE.Vector3());
+            gltf.scene.position.sub(center);
+            
+            gltf.scene.traverse((child) => {
+                if (child.isMesh) {
+                    child.material.transparent = false;
+                    child.material.depthWrite = true;
+                    child.material.side = THREE.DoubleSide; 
+                    child.geometry.computeVertexNormals();
+
+                    const positions = child.geometry.attributes.position;
+                    child.userData.originalPositions = Float32Array.from(positions.array);
+                    meshes.push(child);
+                }
+            });
+            headGroup.add(gltf.scene);
+        });
+
+        // --- INTERACTION ---
+        window.addEventListener('mousedown', (e) => {
+            if (meshes.length === 0) return;
+            
+            // Logic to check if we clicked the head
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(meshes);
+
+            if (intersects.length > 0) {
+                isDragging = true;
+                controls.enabled = false; // Disable zoom while dragging face
+                
+                dragPlane.setFromNormalAndCoplanarPoint(camera.getWorldDirection(new THREE.Vector3()), intersects[0].point);
+                raycaster.ray.intersectPlane(dragPlane, dragStartPoint);
+                headGroup.worldToLocal(dragStartPoint);
+            }
+        });
+
+        window.addEventListener('mousemove', (e) => {
+            mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+            if (!isDragging) return;
+
+            raycaster.setFromCamera(mouse, camera);
+            raycaster.ray.intersectPlane(dragPlane, currentDragPoint);
+            headGroup.worldToLocal(currentDragPoint);
+
+            const delta = new THREE.Vector3().subVectors(currentDragPoint, dragStartPoint);
+            delta.clampLength(0, STRETCH_LIMIT);
+
+            meshes.forEach(mesh => {
+                const positions = mesh.geometry.attributes.position;
+                const originals = mesh.userData.originalPositions;
+                
+                // Inverse matrix to calculate local distance correctly inside the group
+                const meshInverseMatrix = mesh.matrixWorld.clone().invert();
+                const localDragStart = dragStartPoint.clone().applyMatrix4(meshInverseMatrix);
+                const localDelta = delta.clone().applyMatrix4(new THREE.Matrix4().extractRotation(meshInverseMatrix));
+
+                for (let i = 0; i < positions.count; i++) {
+                    const ox = originals[i*3];
+                    const oy = originals[i*3+1];
+                    const oz = originals[i*3+2];
+
+                    const dist = Math.sqrt(
+                        Math.pow(ox - localDragStart.x, 2) +
+                        Math.pow(oy - localDragStart.y, 2) +
+                        Math.pow(oz - localDragStart.z, 2)
+                    );
+
+                    // SHARPER FALLOFF: (dist*dist) makes the influence drop faster
+                    // This creates the "Nose Only" effect rather than "Whole Face"
+                    if (dist < RADIUS) {
+                        const factor = (RADIUS - dist) / RADIUS;
+                        // Cubic easing for smoother, sharper peaks
+                        const influence = Math.pow(factor, 3); 
+
+                        positions.setX(i, ox + (localDelta.x * influence));
+                        positions.setY(i, oy + (localDelta.y * influence));
+                        positions.setZ(i, oz + (localDelta.z * influence));
+                    }
+                }
+                positions.needsUpdate = true;
+            });
+        });
+
+        window.addEventListener('mouseup', () => {
+            isDragging = false;
+            controls.enabled = true; // Re-enable zoom
+            lastMouseUpTime = Date.now(); 
+        });
+
+        // --- ANIMATION LOOP ---
+        function animate() {
+            requestAnimationFrame(animate);
+            const now = Date.now();
+
+            if (!isDragging) {
+                // 1. Idle Animation (Look around naturally)
+                // We use Sine waves with different frequencies to make it look non-robotic
+                headGroup.rotation.y = Math.sin(now * IDLE_SPEED) * IDLE_AMP;
+                headGroup.rotation.x = Math.sin(now * IDLE_SPEED * 0.7) * (IDLE_AMP * 0.5);
+
+                // 2. Elastic Snapback (Wait for delay, then return)
+                if (now - lastMouseUpTime > RELEASE_DELAY) {
+                    let isMoving = false;
+                    meshes.forEach(mesh => {
+                        const positions = mesh.geometry.attributes.position;
+                        const originals = mesh.userData.originalPositions;
+
+                        for (let i = 0; i < positions.count; i++) {
+                            const cx = positions.getX(i);
+                            const cy = positions.getY(i);
+                            const cz = positions.getZ(i);
+                            const ox = originals[i*3];
+                            const oy = originals[i*3+1];
+                            const oz = originals[i*3+2];
+
+                            const dx = ox - cx;
+                            const dy = oy - cy;
+                            const dz = oz - cz;
+
+                            if (Math.abs(dx) > 0.001 || Math.abs(dy) > 0.001 || Math.abs(dz) > 0.001) {
+                                positions.setX(i, cx + dx * RETURN_SPEED);
+                                positions.setY(i, cy + dy * RETURN_SPEED);
+                                positions.setZ(i, cz + dz * RETURN_SPEED);
+                                isMoving = true;
+                            } else {
+                                positions.setX(i, ox);
+                                positions.setY(i, oy);
+                                positions.setZ(i, oz);
+                            }
+                        }
+                        if (isMoving) {
+                            positions.needsUpdate = true;
+                            // mesh.geometry.computeVertexNormals(); // Uncomment if lighting looks weird during snapback
+                        }
+                    });
+                }
+            } else {
+                // While dragging, make the head look toward the mouse slightly
+                // This adds to the depth effect
+                headGroup.rotation.y += (mouse.x * 0.5 - headGroup.rotation.y) * 0.1;
+                headGroup.rotation.x += (-mouse.y * 0.5 - headGroup.rotation.x) * 0.1;
+            }
+
+            renderer.render(scene, camera);
+            controls.update();
+        }
+
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>

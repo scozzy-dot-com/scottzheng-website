@@ -2,17 +2,17 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Scott Face 64</title>
+    <title>Super Scott 64</title>
     <style>
         body { margin: 0; overflow: hidden; background-color: #D2FF00; user-select: none;
             background-image: url('./images/superscott64.webp');
-            background-size: cover; /* Ensures the image covers the whole page */
-            background-position: center center; /* Centers the image */
-            background-repeat: no-repeat; /* Prevents the image from repeating */ }
+            background-size: cover;
+            background-position: center center;
+            background-repeat: no-repeat; }
         canvas { display: block; cursor: grab; }
         canvas:active { cursor: grabbing; }
         
-        /* --- UI LAYER --- */
+        /* UI LAYER */
         #ui {
             position: absolute; bottom: 15px; width: 100%; text-align: center;
             font-family: 'Courier New', Courier, monospace; font-weight: bold; color: #ffffff; pointer-events: none;
@@ -22,12 +22,12 @@
             pointer-events: auto; cursor: pointer; text-decoration: underline;
         }
 
-        /* --- GIF BUTTON (Bottom Left) --- */
+        /* PRESS START BUTTON */
         #start-btn {
             position: absolute; 
             bottom: 30px; 
             left: 20px;
-            width: 180px; /* Adjust size if needed */
+            width: 180px;
             cursor: pointer;
             pointer-events: auto;
             z-index: 20;
